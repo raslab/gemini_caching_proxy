@@ -13,13 +13,12 @@ This project implements a local proxy for the Gemini API. It intercepts requests
 ## Architecture
 
 The proxy follows a simple proxy pattern:
-
 ```mermaid
-graph LR
-    Client --> "Proxy [FastAPI Application]"
-    Proxy --> Gemini API
-    Gemini API --> Proxy
-    Proxy --> "Database [MongoDB]"
+flowchart TD
+    Client(["Client"]) --> Proxy["Proxy [FastAPI Application]"]
+    Proxy --> GeminiAPI["Gemini API"]
+    GeminiAPI --> Proxy
+    Proxy --> Database["Database [MongoDB]"]
     Proxy --> Client
 ```
 
