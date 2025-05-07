@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "18001:8000"
+    environment:
+      # This connects to the 'mongo' service within the Docker network
+      MONGO_URI: "mongodb://mongo:27017/"
+      # Add your Gemini API key here or use a .env file and uncomment the env_file line
+      # GEMINI_API_KEY: "YOUR_GEMINI_API_KEY"
+    depends_on:
+      - mongo
+    networks:
+      - llm_proxy_network
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      # Persist data in a named volume
+      - llm_proxy_mongo_data:/data/db
+    networks:
+      - llm_proxy_network
+
+volumes:
+  llm_proxy_mongo_data:
+
+networks:
+  llm_proxy_network:
+    driver: bridge
