@@ -16,10 +16,10 @@ The proxy follows a simple proxy pattern:
 
 ```mermaid
 graph LR
-    Client --> Proxy (FastAPI Application)
+    Client --> Proxy [FastAPI Application]
     Proxy --> Gemini API
     Gemini API --> Proxy
-    Proxy --> Database (MongoDB)
+    Proxy --> Database [MongoDB]
     Proxy --> Client
 ```
 
