@@ -14,6 +14,7 @@ services:
       - mongo
     networks:
       - llm_proxy_network
+    restart: always
 
   mongo:
     image: mongo:latest
@@ -24,6 +25,7 @@ services:
       - llm_proxy_mongo_data:/data/db
     networks:
       - llm_proxy_network
+    restart: always
 
 volumes:
   llm_proxy_mongo_data:
