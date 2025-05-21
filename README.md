@@ -280,6 +280,137 @@ db.getCollection("gemini_interactions").aggregate([
     }
   ]).toArray();
 ```
+or you can see requests for the specific date:
+```javascript
+db.getCollection("gemini_interactions").aggregate([
+    {
+        $match: {
+            "timestamp": {
+                $gte: ISODate("2025-05-21T00:00:00.000Z"), // Start of today in UTC
+                $lt: ISODate("2025-05-22T00:00:00.000Z") // Start of tomorrow in UTC
+            },
+            "request.body.contents": { $exists: true },
+            "response.body": { $exists: true }
+        }
+    },
+    {
+        $project: {
+            _id: 0,
+            timestamp: {
+                $dateToString: {
+                    format: "%Y-%m-%d %H:%M:%S",
+                    date: "$timestamp"
+                }
+            },
+            // Extract system instruction
+            system_instruction: {
+                $reduce: {
+                    input: "$request.body.systemInstruction.parts",
+                    initialValue: "",
+                    in: { $concat: ["$$value", "$$this.text"] }
+                }
+            },
+            // Process chat contents
+            chat_history: {
+                $map: {
+                    input: "$request.body.contents",
+                    as: "content",
+                    in: {
+                        role: "$$content.role",
+                        parts: {
+                            $reduce: {
+                                input: "$$content.parts",
+                                initialValue: "",
+                                in: { $concat: ["$$value", "$$this.text"] }
+                            }
+                        }
+                    }
+                }
+            },
+            model_response_raw: "$response.body"
+        }
+    },
+    {
+        $addFields: {
+            // Split the response string by "\r\n\r\n" and filter out empty strings
+            _temp_responseLines: {
+                $filter: {
+                    input: { $split: ["$model_response_raw", "\r\n\r\n"] },
+                    as: "line",
+                    cond: { $ne: ["$$line", ""] }
+                }
+            }
+        }
+    },
+    {
+        $addFields: {
+            // Extract the JSON string after "data: " from each line
+            _temp_jsonDataStrings: {
+                $map: {
+                    input: "$_temp_responseLines",
+                    as: "line",
+                    in: {
+                        $let: {
+                            vars: { line: "$$line" },
+                            in: {
+                                $cond: {
+                                    if: { $regexMatch: { input: "$$line", regex: "^data: " } },
+                                    then: { $substrBytes: ["$$line", 6, { $subtract: [{ $strLenBytes: "$$line" }, 6] }] },
+                                    else: "$$line"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
+        $addFields: {
+            // Attempt to parse each JSON string and extract the 'text' from 'candidates.content.parts.text'
+            model_response_texts : {
+                $map: {
+                    input: "$_temp_jsonDataStrings",
+                    as: "jsonString",
+                    in: {
+                        $let: {
+                            vars: { jsonString: "$$jsonString" },
+                            in: {
+                                $cond: {
+                                    if: { $regexMatch: { input: "$$jsonString", regex: "^.*\"text\": \".*?\"}].*$" } }, // Note: This regex might have a syntax issue with "}]."
+                                    then: {
+                                        $let: {
+                                            vars: {
+                                                matchResult: {
+                                                    $regexFind: {
+                                                        input: "$$jsonString",
+                                                        regex: /"text": "(.*?)"/, // This regex captures the text
+                                                    }
+                                                }
+                                            },
+                                            in: { $arrayElemAt: ["$$matchResult.captures", 0] } // Extract the first captured group
+                                        }
+                                    },
+                                    else: null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ,
+    {
+        $project: {
+            timestamp: 1,
+            system_instruction: 1,
+            chat_history: 1,
+            model_response: { $reduce: { input: "$model_response_texts", initialValue: "", in: { $concat: ["$$value", "$$this"] } } }
+        }
+    }
+]).toArray();
+```
 
 
 ## Contributing
