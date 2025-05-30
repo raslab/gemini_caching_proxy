@@ -85,6 +85,7 @@ async def proxy_gemini_api(full_path: str, request: Request):
                     # Remove headers that might cause issues with streaming to the client
                     response_headers.pop('content-length', None)
                     response_headers.pop('transfer-encoding', None)
+                    response_headers.pop('content-encoding', None) # ADDED: Prevent client decompression issues
 
                     async def stream_response():
                         full_response_body = b""
@@ -180,10 +181,12 @@ async def proxy_gemini_api(full_path: str, request: Request):
                     print(f"Error saving non-streaming interaction to MongoDB: {db_error}")
 
                 # Return response to client
+                response_headers = dict(gemini_response.headers)
+                response_headers.pop('content-encoding', None) # ADDED: Prevent client decompression issues
                 return Response(
                     content=gemini_response.content,
                     status_code=gemini_response.status_code,
-                    headers=dict(gemini_response.headers),
+                    headers=response_headers,
                 )
 
     except Exception as e:
